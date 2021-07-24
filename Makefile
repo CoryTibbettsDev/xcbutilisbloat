@@ -1,5 +1,6 @@
 PROGRAMNAME := xcbutilisbloat
-VERSION ?= $(shell git describe --tags)
+VERSION ?= $(shell git tag || printf "0.1")
+LONGVERSION ?= $(shell git describe --tags || printf "0.1")
 
 EXEC = $(PROGRAMNAME)
 # Uncomment static or shared library which ever you want

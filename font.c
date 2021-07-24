@@ -131,42 +131,235 @@ xuib_load_font(const char *name)
 	return holder;
 }
 
+xcb_render_pictforminfo_t *
+find_pict_format(
+		const xcb_render_query_pict_formats_reply_t *formats,
+		unsigned long mask,
+		const xcb_render_pictforminfo_t *ptemplate,
+		int count)
+{
+	xcb_render_pictforminfo_iterator_t i;
+	if (!formats)
+		return 0;
+	for (i = xcb_render_query_pict_formats_formats_iterator(formats);
+			i.rem;
+			xcb_render_pictforminfo_next(&i))
+	{
+		if (mask & XUIB_PICT_FORMAT_ID)
+			if (ptemplate->id != i.data->id)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_TYPE)
+			if (ptemplate->type != i.data->type)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_DEPTH)
+			if (ptemplate->depth != i.data->depth)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_RED)
+			if (ptemplate->direct.red_shift != i.data->direct.red_shift)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_RED_MASK)
+			if (ptemplate->direct.red_mask != i.data->direct.red_mask)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_GREEN)
+			if (ptemplate->direct.green_shift != i.data->direct.green_shift)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_GREEN_MASK)
+			if (ptemplate->direct.green_mask != i.data->direct.green_mask)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_BLUE)
+			if (ptemplate->direct.blue_shift != i.data->direct.blue_shift)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_BLUE_MASK)
+			if (ptemplate->direct.blue_mask != i.data->direct.blue_mask)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_ALPHA)
+			if (ptemplate->direct.alpha_shift != i.data->direct.alpha_shift)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_ALPHA_MASK)
+			if (ptemplate->direct.alpha_mask != i.data->direct.alpha_mask)
+				continue;
+		if (mask & XUIB_PICT_FORMAT_COLORMAP)
+			if (ptemplate->colormap != i.data->colormap)
+				continue;
+		if (count-- == 0)
+			return i.data;
+	}
+	return 0;
+}
 
 xcb_render_pictforminfo_t *
-get_pictforminfo(xcb_connection_t *c)
+get_pictforminfo(
+		xcb_connection_t *c,
+		xuib_pict_standard_t format)
 {
-    xcb_render_query_pict_formats_reply_t *formats;
-    xcb_render_query_pict_formats_cookie_t formats_cookie;
+	xcb_render_query_pict_formats_reply_t *formats;
+	xcb_render_query_pict_formats_cookie_t formats_cookie;
+	xcb_render_pictforminfo_t *pfi;
 
-    formats_cookie = xcb_render_query_pict_formats(c);
+	formats_cookie = xcb_render_query_pict_formats(c);
 
-    formats = xcb_render_query_pict_formats_reply(c, formats_cookie, 0);
-	if (formats == NULL) {
-		fprintf(stderr, "Formats reply is null\n");
-	}
+	formats = xcb_render_query_pict_formats_reply(c, formats_cookie, 0);
 	if (!formats) {
 		fprintf(stderr, "Bad formats reply\n");
 	}
 
-	xcb_render_pictforminfo_t *pfi;
-    xcb_render_pictforminfo_iterator_t iterator;
-    for (iterator = xcb_render_query_pict_formats_formats_iterator(formats);
-		iterator.rem;
-		xcb_render_pictforminfo_next(&iterator)) {
-		if (XCB_RENDER_PICT_TYPE_DIRECT != iterator.data->type) {
-			//printf("Not right type\n");
-		}
-		if (iterator.data->depth == 32) {
-			//printf("depth 32\n");
-		} else if (iterator.data->depth == 24) {
-			pfi = iterator.data;
-			//printf("depth 24\n");
-		} else if (iterator.data->depth == 16) {
-			//printf("depth 16\n");
-		} else if (iterator.data->depth == 8) {
-			//printf("depth 8\n");
-		}
-	}
+	static const struct {
+		xcb_render_pictforminfo_t temp;
+		unsigned long mask;
+	} standardFormats[] = {
+		/* XUIB_PICT_STANDARD_ARGB_32 */
+		{
+			{
+			0, /* id */
+			XCB_RENDER_PICT_TYPE_DIRECT, /* type */
+			32,	/* depth */
+			{ 0 }, /* pad */
+			{ /* direct */
+				16,	/* direct.red */
+				0xff, /* direct.red_mask */
+				8, /* direct.green */
+				0xff, /* direct.green_mask */
+				0, /* direct.blue */
+				0xff, /* direct.blue_mask */
+				24, /* direct.alpha */
+				0xff, /* direct.alpha_mask */
+			},
+			0, /* colormap */
+			},
+			XUIB_PICT_FORMAT_TYPE |
+			XUIB_PICT_FORMAT_DEPTH |
+			XUIB_PICT_FORMAT_RED |
+			XUIB_PICT_FORMAT_RED_MASK |
+			XUIB_PICT_FORMAT_GREEN |
+			XUIB_PICT_FORMAT_GREEN_MASK |
+			XUIB_PICT_FORMAT_BLUE |
+			XUIB_PICT_FORMAT_BLUE_MASK |
+			XUIB_PICT_FORMAT_ALPHA |
+			XUIB_PICT_FORMAT_ALPHA_MASK,
+		},
+		/* XUIB_PICT_STANDARD_RGB_24 */
+		{
+			{
+			0, /* id */
+			XCB_RENDER_PICT_TYPE_DIRECT, /* type */
+			24,	/* depth */
+			{ 0 }, /* pad */
+			{ /* direct */
+				16, /* direct.red */
+				0xff, /* direct.red_MASK */
+				8, /* direct.green */
+				0xff, /* direct.green_MASK */
+				0, /* direct.blue */
+				0xff, /* direct.blue_MASK */
+				0, /* direct.alpha */
+				0x00, /* direct.alpha_MASK */
+			},
+			0,			    /* colormap */
+			},
+			XUIB_PICT_FORMAT_TYPE |
+			XUIB_PICT_FORMAT_DEPTH |
+			XUIB_PICT_FORMAT_RED |
+			XUIB_PICT_FORMAT_RED_MASK |
+			XUIB_PICT_FORMAT_GREEN |
+			XUIB_PICT_FORMAT_GREEN_MASK |
+			XUIB_PICT_FORMAT_BLUE |
+			XUIB_PICT_FORMAT_BLUE_MASK |
+			XUIB_PICT_FORMAT_ALPHA_MASK,
+		},
+		/* XUIB_PICT_STANDARD_A_8 */
+		{
+			{
+			0, /* id */
+			XCB_RENDER_PICT_TYPE_DIRECT,    /* type */
+			8, /* depth */
+			{ 0 }, /* pad */
+			{ /* direct */
+				0, /* direct.red */
+				0x00, /* direct.red_MASK */
+				0, /* direct.green */
+				0x00, /* direct.green_MASK */
+				0, /* direct.blue */
+				0x00, /* direct.blue_MASK */
+				0, /* direct.alpha */
+				0xff, /* direct.alpha_MASK */
+			},
+			0, /* colormap */
+			},
+			XUIB_PICT_FORMAT_TYPE |
+			XUIB_PICT_FORMAT_DEPTH |
+			XUIB_PICT_FORMAT_RED_MASK |
+			XUIB_PICT_FORMAT_GREEN_MASK |
+			XUIB_PICT_FORMAT_BLUE_MASK |
+			XUIB_PICT_FORMAT_ALPHA |
+			XUIB_PICT_FORMAT_ALPHA_MASK,
+		},
+		/* XUIB_PICT_STANDARD_A_4 */
+		{
+			{
+			0, /* id */
+			XCB_RENDER_PICT_TYPE_DIRECT, /* type */
+			4, /* depth */
+			{ 0 }, /* pad */
+			{ /* direct */
+				0, /* direct.red */
+				0x00, /* direct.red_MASK */
+				0, /* direct.green */
+				0x00, /* direct.green_MASK */
+				0, /* direct.blue */
+				0x00, /* direct.blue_MASK */
+				0, /* direct.alpha */
+				0x0f, /* direct.alpha_MASK */
+			},
+			0,			    /* colormap */
+			},
+			XUIB_PICT_FORMAT_TYPE |
+			XUIB_PICT_FORMAT_DEPTH |
+			XUIB_PICT_FORMAT_RED_MASK |
+			XUIB_PICT_FORMAT_GREEN_MASK |
+			XUIB_PICT_FORMAT_BLUE_MASK |
+			XUIB_PICT_FORMAT_ALPHA |
+			XUIB_PICT_FORMAT_ALPHA_MASK,
+		},
+		/* XUIB_PICT_STANDARD_A_1 */
+		{
+			{
+			0, /* id */
+			XCB_RENDER_PICT_TYPE_DIRECT, /* type */
+			1, /* depth */
+			{ 0 }, /* pad */
+			{ /* direct */
+				0, /* direct.red */
+				0x00, /* direct.red_MASK */
+				0, /* direct.green */
+				0x00, /* direct.green_MASK */
+				0, /* direct.blue */
+				0x00, /* direct.blue_MASK */
+				0, /* direct.alpha */
+				0x01, /* direct.alpha_MASK */
+			},
+			0, /* colormap */
+			},
+			XUIB_PICT_FORMAT_TYPE |
+			XUIB_PICT_FORMAT_DEPTH |
+			XUIB_PICT_FORMAT_RED_MASK |
+			XUIB_PICT_FORMAT_GREEN_MASK |
+			XUIB_PICT_FORMAT_BLUE_MASK |
+			XUIB_PICT_FORMAT_ALPHA |
+			XUIB_PICT_FORMAT_ALPHA_MASK,
+		},
+	};
+
+	if (format < 0 || format >= sizeof(standardFormats) / sizeof(*standardFormats))
+		return 0;
+
+	pfi = find_pict_format(
+			formats,
+			standardFormats[format].mask,
+			&standardFormats[format].temp,
+			0);
+
+	free(formats);
+
 	return pfi;
 }
 
@@ -175,7 +368,7 @@ create_pen(xcb_connection_t *c, xcb_screen_t *s, xcb_window_t window)
 {
 	xcb_void_cookie_t cookie;
 
-	xcb_render_pictforminfo_t *pfi = get_pictforminfo(c);
+	xcb_render_pictforminfo_t *pfi = get_pictforminfo(c, XUIB_PICT_STANDARD_A_8);
 
 	xcb_pixmap_t pm = xcb_generate_id(c);
 	cookie = xcb_create_pixmap_checked(c, s->root_depth, pm, s->root, 1, 1);
@@ -228,7 +421,7 @@ xuib_draw_text(
 {
 	xcb_void_cookie_t cookie;
 
-	xcb_render_pictforminfo_t *pfi = get_pictforminfo(c);
+	xcb_render_pictforminfo_t *pfi = get_pictforminfo(c, XUIB_PICT_STANDARD_RGB_24);
 
 	xcb_pixmap_t pm = xcb_generate_id(c);
 	cookie = xcb_create_pixmap_checked(
@@ -246,7 +439,7 @@ xuib_draw_text(
 			picture,
 			pm,
 			pfi->id,
-			NULL,	
+			NULL,
 			NULL);
 	xuib_test_void_cookie(cookie, c, "Could not create draw_text picture");
 

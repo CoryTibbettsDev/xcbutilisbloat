@@ -76,23 +76,26 @@ int main()
 	xcb_flush(connection);
 
 	xcb_generic_event_t *ev;
+	xcb_key_press_event_t *kr;
 	while (( ev = xcb_wait_for_event(connection))) {
 		xcb_generic_error_t *err = (xcb_generic_error_t *)ev;
 		switch (ev->response_type & ~0x80) {
-		case XCB_EXPOSE:
-			xuib_draw_text(connection, screen, window, holder, 0, 0, width, height, "hello");
-			break;
-		case XCB_KEY_PRESS:
-			xcb_key_press_event_t *kr = (xcb_key_press_event_t *)ev;
-			switch (kr->detail) {
-				case 9: /* escape */
-				case 24: /* Q */
-					xcb_disconnect(connection);
-				}
-		case 0:
-			printf("Received X11 error %d\n", err->error_code);
-		default:
-			printf("default idk\n");
+			case XCB_EXPOSE:
+				xuib_draw_text(connection, screen, window, holder, 0, 0, width, height, "hello");
+				break;
+			case XCB_KEY_PRESS:
+				kr = (xcb_key_press_event_t *)ev;
+				switch (kr->detail) {
+					case 9: /* escape */
+					case 24: /* Q */
+						xcb_disconnect(connection);
+					}
+				break;
+			case 0:
+				printf("Received X11 error %d\n", err->error_code);
+				break;
+			default:
+				printf("default idk\n");
 		}
 		free(ev);
 	}

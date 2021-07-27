@@ -14,7 +14,7 @@ CP ?= cp -f
 # This is library so it goes is /usr/local/lib
 # https://unix.stackexchange.com/questions/8656/usr-bin-vs-usr-local-bin-on-linux
 PREFIX ?= /usr/local
-DEST ?= $(PREFIX)/lib
+DESTDIR ?= $(PREFIX)/lib
 # Directory for header file to be installed in
 DESTINCLUDE ?= $(PREFIX)/include
 
@@ -68,7 +68,7 @@ test: debug
 else ifeq ($(INSTALLEXEC),$(SHARED))
 test: debug
 	ldconfig -n .
-	ln -sf $(SHARED0) $(SHARED) 
+	ln -sf $(SHARED0) $(SHARED)
 	$(CC) $(TESTFLAGS) -c test.c
 	$(CC) -o test test.o -L. $(TESTLIBS)
 	LD_LIBRARY_PATH="." ./test
@@ -76,18 +76,18 @@ endif
 
 ifeq ($(INSTALLEXEC),$(STATIC))
 install: all
-	install $(INSTALLEXEC) $(DEST)
-	$(CP) $(HDR) $(DESTINCLUDE) 
+	install $(INSTALLEXEC) $(DESTDIR)
+	$(CP) $(HDR) $(DESTINCLUDE)
 else ifeq ($(INSTALLEXEC),$(SHARED))
 install: all
-	install $(SHAREDVERSION) $(DEST)
-	ln -sf $(DEST)/$(SHARED0) $(DEST)/$(SHARED)
-	ldconfig $(DEST)
-	$(CP) $(HDR) $(DESTINCLUDE) 
+	install $(SHAREDVERSION) $(DESTDIR)
+	ln -sf $(DESTDIR)/$(SHARED0) $(DESTDIR)/$(SHARED)
+	ldconfig $(DESTDIR)
+	$(CP) $(HDR) $(DESTINCLUDE)
 endif
 
 uninstall:
-	$(RM) $(DEST)/$(STATIC)* $(DEST)/$(SHARED)* $(DESTINCLUDE)/$(HDR)
+	$(RM) $(DESTDIR)/$(STATIC)* $(DESTDIR)/$(SHARED)* $(DESTINCLUDE)/$(HDR)
 
 clean:
 	$(RM) $(OBJ) lib$(EXEC)* test test.o

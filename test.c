@@ -56,7 +56,7 @@ int main()
 			XCB_WINDOW_CLASS_INPUT_OUTPUT, /* class */
 			screen->root_visual, /* visual */
 			mask, value); /* properties of window and their values */
-	xuib_test_void_cookie(cookie, connection, "Could not create window");
+	xuib_test_void_cookie(connection, cookie, "Could not create window");
 
 	/* Begin Testing */
 
@@ -70,8 +70,8 @@ int main()
 	xuib_font_holder_t *holder;
 	holder = xuib_load_font(name);
 
-	xcb_void_cookie_t mapCookie = xcb_map_window(connection, window);
-	xuib_test_void_cookie(mapCookie, connection, "Could not map window");
+	cookie = xcb_map_window(connection, window);
+	xuib_test_void_cookie(connection, cookie, "Could not map window");
 
 	xcb_flush(connection);
 
@@ -81,7 +81,14 @@ int main()
 		xcb_generic_error_t *err = (xcb_generic_error_t *)ev;
 		switch (ev->response_type & ~0x80) {
 			case XCB_EXPOSE:
-				xuib_draw_text(connection, screen, window, holder, 0, 0, width, height, "hello");
+				xuib_draw_text(
+						connection,
+						screen,
+						window,
+						holder,
+						0, 0,
+						width, height,
+						"hello");
 				break;
 			case XCB_KEY_PRESS:
 				kr = (xcb_key_press_event_t *)ev;

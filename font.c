@@ -364,7 +364,7 @@ get_pictforminfo(
 }
 
 xcb_render_picture_t
-create_pen(xcb_connection_t *c, xcb_screen_t *s, xcb_window_t window)
+create_pen(xcb_connection_t *c, xcb_screen_t *s)
 {
 	xcb_void_cookie_t cookie;
 
@@ -372,7 +372,7 @@ create_pen(xcb_connection_t *c, xcb_screen_t *s, xcb_window_t window)
 
 	xcb_pixmap_t pm = xcb_generate_id(c);
 	cookie = xcb_create_pixmap_checked(c, s->root_depth, pm, s->root, 1, 1);
-	xuib_test_void_cookie(cookie, c, "Could not create pen pixmap");
+	xuib_test_void_cookie(c, cookie, "Could not create pen pixmap");
 
 	xcb_render_picture_t picture = xcb_generate_id(c);
 	cookie = xcb_render_create_picture_checked(
@@ -382,7 +382,7 @@ create_pen(xcb_connection_t *c, xcb_screen_t *s, xcb_window_t window)
 			pfi->id,
 			XCB_RENDER_CP_REPEAT,
 			(uint32_t[]){ XCB_RENDER_REPEAT_NORMAL });
-	xuib_test_void_cookie(cookie, c, "Could not create pen picture");
+	xuib_test_void_cookie(c, cookie, "Could not create pen picture");
 
 	xcb_render_color_t color = {
 		.red = 0x00ff,
@@ -403,10 +403,51 @@ create_pen(xcb_connection_t *c, xcb_screen_t *s, xcb_window_t window)
 			XCB_RENDER_PICT_OP_OVER,
 			picture,
 			color, 1, &rect);
-	xuib_test_void_cookie(cookie, c, "Could not fill pen rectangle");
+	xuib_test_void_cookie(c, cookie, "Could not fill pen rectangle");
 
 	xcb_free_pixmap(c, pm);
 	return picture;
+}
+
+xcb_render_glyphset_t
+load_glyphset(xcb_connection_t *c, xuib_font_holder_t *holder, char *text)
+{
+	unsigned int i;
+
+	xcb_void_cookie_t cookie;
+
+	xcb_render_glyphset_t gs;
+	xcb_render_pictforminfo_t *fmt;
+
+	FT_UInt glyph_index;
+	FT_Face face = holder->face;
+	FT_Error error;
+
+	fmt = get_pictforminfo(c, XUIB_PICT_STANDARD_A_8);
+
+	gs = xcb_generate_id(c);
+	cookie = xcb_render_create_glyph_set_checked(c, gs, fmt->id);
+	xuib_test_void_cookie(c, cookie, "Could not create glyphset in load_glyphset");
+
+	for (i = 0; i < strlen(text); i++) {
+		glyph_index = FT_Get_Char_Index(
+				holder->face,
+				(FT_ULong) text[i]);
+
+		error = FT_Select_Charmap(face, ft_encoding_unicode);
+		if (error) {
+			fprintf(stderr, "Select charmap error\n");
+		}
+
+		glyph_index = FT_Get_Char_Index(face, (FT_ULong) text[i]);
+
+		error = FT_Load_Glyph(face, glyph_index, FT_LOAD_RENDER);
+		if (error) {
+			fprintf(stderr, "Load glyph error\n");
+		}
+	}
+
+	return gs;
 }
 
 void
@@ -423,6 +464,9 @@ xuib_draw_text(
 
 	xcb_render_pictforminfo_t *pfi = get_pictforminfo(c, XUIB_PICT_STANDARD_RGB_24);
 
+	xcb_render_glyphset_t gs;
+	gs = load_glyphset(c, holder, text);
+
 	xcb_pixmap_t pm = xcb_generate_id(c);
 	cookie = xcb_create_pixmap_checked(
 			c,
@@ -431,7 +475,7 @@ xuib_draw_text(
 			s->root,
 			width,
 			height);
-	xuib_test_void_cookie(cookie, c, "Could not create draw_text pixmap");
+	xuib_test_void_cookie(c, cookie, "Could not create draw_text pixmap");
 
 	xcb_render_picture_t picture = xcb_generate_id(c);
 	cookie = xcb_render_create_picture_checked(
@@ -439,9 +483,9 @@ xuib_draw_text(
 			picture,
 			pm,
 			pfi->id,
-			NULL,
+			0,
 			NULL);
-	xuib_test_void_cookie(cookie, c, "Could not create draw_text picture");
+	xuib_test_void_cookie(c, cookie, "Could not create draw_text picture");
 
 	xcb_render_color_t rect_color = {
 		.red = 0x00ff,
@@ -462,7 +506,7 @@ xuib_draw_text(
 			XCB_RENDER_PICT_OP_OVER,
 			picture,
 			rect_color, 1, &window_rect);
-	xuib_test_void_cookie(cookie, c, "can't fill rectangles");
+	xuib_test_void_cookie(c, cookie, "can't fill rectangles");
 
 	xcb_gcontext_t gc = xcb_generate_id(c);
 	uint32_t masks = XCB_GC_FOREGROUND | XCB_GC_GRAPHICS_EXPOSURES;
@@ -470,8 +514,8 @@ xuib_draw_text(
 	values[0] = 0xe6e3c6 | 0xff000000;
 	values[1] = 0;
 	cookie = xcb_create_gc(c, gc, window, masks, values);
-	xuib_test_void_cookie(cookie, c, "Could not create draw_text gc");
-		
+	xuib_test_void_cookie(c, cookie, "Could not create draw_text gc");
+
 	// xcb_render_color_t color = {
 	// 	.red = 0x00ff,
 	// 	.green = 0xff0f,
@@ -491,7 +535,7 @@ xuib_draw_text(
 	// 		src_x, src_y, /* int16_t src_x, int16_t src_y */
 	// 		glyphsmode_len, /* uint32_t glyphsmode_len */
 	// 		glyphcmds); /* const unint8_t *glyphcmds */
-	// xuib_test_void_cookie(cookie, c, "Render composite glyphs failed");
+	// xuib_test_void_cookie(c, cookie, "Render composite glyphs failed");
 
 	cookie = xcb_copy_area_checked(
 			c, /* xcb_connection_t */
@@ -504,7 +548,7 @@ xuib_draw_text(
 			0, /* Top left y coordinate of the region where to copy */
 			400, /* Width of the region to copy */
 			300); /* Height of the region to copy */
-	xuib_test_void_cookie(cookie, c, "Could not copy area in draw_text");
+	xuib_test_void_cookie(c, cookie, "Could not copy area in draw_text");
 
 	xcb_flush(c);
 	xcb_free_pixmap(c, pm);

@@ -34,8 +34,8 @@ typedef enum xuib_pict_format_t {
 
 /* util.c */
 void xuib_test_void_cookie(
-		xcb_void_cookie_t cookie,
 		xcb_connection_t *c,
+		xcb_void_cookie_t cookie,
 		char *message);
 
 /* font.c */

@@ -254,7 +254,7 @@ get_pictforminfo(
 				0, /* direct.alpha */
 				0x00, /* direct.alpha_MASK */
 			},
-			0,			    /* colormap */
+			0, /* colormap */
 			},
 			XUIB_PICT_FORMAT_TYPE |
 			XUIB_PICT_FORMAT_DEPTH |
@@ -446,7 +446,6 @@ load_glyphset(xcb_connection_t *c, xuib_font_holder_t *holder, char *text)
 			fprintf(stderr, "Load glyph error\n");
 		}
 	}
-
 	return gs;
 }
 

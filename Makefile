@@ -1,29 +1,25 @@
 PROG := xcbutilisbloat
 VERSION = `git describe --always --tags`
 
-# INSTALLEXEC = ${STATIC}
-INSTALLEXEC = ${SHARED}
-
 RM ?= rm -f
 CP ?= cp -f
 
 DESTDIR ?=
 PREFIX ?= ${DESTDIR}/usr/local
 LIBDIR ?= ${PREFIX}/lib
-# Directory for header file to be installed in
 INCDIR ?= ${PREFIX}/include
 
 # FREETYPEINC := `pkgconf --cflags freetype2`
 FREETYPEINC := `pkg-config --cflags freetype2`
-INCS = ${FREETYPEINC}
+INC = ${FREETYPEINC}
 BASICFLAGS = -std=c99 -Wall
-CFLAGS += ${BASICFLAGS} ${INCS}
-CPPFLAGS += -DPROGRAMNAME="\"${PROGRAMNAME}\"" -DVERSION="\"${VERSION}\""
+CFLAGS += ${BASICFLAGS} ${INC}
+CPPFLAGS += -DPROG="\"${PROG}\"" -DVERSION="\"${VERSION}\""
 # Included libraries
 # For some reason the include path for xcb render util is <xcb/xcb_renderutil.h>
 # but the library include (the .so file name) is xcb-render-util
 # why so inconsistent though???
-LDFLAGS += -lfontconfig -lfreetype -lxcb -lxcb-render# -lxcb-render-util
+LDFLAGS += -lfontconfig -lfreetype -lxcb -lxcb-render -lxcb-render-util
 # Extra flags for debugging
 CFDEBUG = -g -pedantic -Wextra -Wno-deprecated-declarations -Wlong-long \
 		-Wconversion -Wsign-conversion -Wreturn-local-addr
@@ -36,19 +32,23 @@ SHARED = lib${PROG}.so
 SHARED0 = ${SHARED}.0
 SHAREDVERSION = ${SHARED}.${VERSION}
 
+INSTALLEXEC ?=
+ifeq (${LIBTYPE},static)
+	INSTALLEXEC = ${STATIC}
+else
+	INSTALLEXEC = ${SHARED}
+endif
+
 .PHONY: clean debug version install uninstall
+
+all: ${INSTALLEXEC}
 
 version:
 	printf "%s Version: %s\n" "${PROG}" "${VERSION}"
 
-# %.o: %.c
-# 	${CC} -c ${CFLAGS} ${CPPFLAGS} $< -o $@
-
 .SUFFIXES: .c .o
 .c.o:
 	${CC} -c ${CFLAGS} ${CPPFLAGS} $< -o $@
-
-all: ${INSTALLEXEC}
 
 ${STATIC}: ${OBJ}
 	ar rcs $@ $^
@@ -62,7 +62,7 @@ debug: CFLAGS += ${CFDEBUG}
 debug: all
 
 TESTFLAGS = ${BASICFLAGS} ${CFDEBUG}
-TESTLIBS = -lc -lxcb -l${PROG}
+TESTLIBS = -lc -l${PROG} -lfontconfig -lfreetype -lxcb #-lxcb-render -lxcb-render-util
 ifeq (${INSTALLEXEC},${STATIC})
 test: debug
 	${CC} -Wall ${TESTFLAGS} -c test.c

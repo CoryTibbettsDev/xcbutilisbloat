@@ -3,20 +3,17 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-/* Include Freetype2 they have a weird system */
-#include <ft2build.h>
-#include FT_FREETYPE_H
+#include <xcb/xcb.h>
+#include <xcb/render.h>
+#include <xcb/xcb_renderutil.h>
 
 #include <fontconfig/fontconfig.h>
 
-#include <xcb/xcb.h>
-#include <xcb/render.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
+// #include FT_ADVANCES_H
 
 #include "xcbutilisbloat.h"
-
-struct xuib_font_holder_t {
-	FT_Face face;
-};
 
 FT_Library library;
 
@@ -65,17 +62,17 @@ font_query(const char *name)
 	match_pat = FcFontMatch(NULL, pat, &result);
 	FcPatternDestroy(pat);
 
-	if (result == FcResultMatch) {
+	if (result == FcResultMatch)
 		return match_pat;
-	} else if (result == FcResultNoMatch) {
+	else if (result == FcResultNoMatch)
 		fprintf(stderr, "There was not a match\n");
-	} else {
+	else
 		fprintf(stderr, "The match was not good enough\n");
-	}
+
 	return NULL;
 }
 
-xuib_font_holder_t *
+FT_Face *
 xuib_load_font(const char *name)
 {
 	FcPattern *pat;
@@ -85,14 +82,12 @@ xuib_load_font(const char *name)
 	FT_Face face;
 	FT_Error error;
 
-	xuib_font_holder_t *holder;
-
 	pat = font_query(name);
 
 	result = FcPatternGet(pat, FC_FILE, 0, &fc_file);
-	if (result != FcResultMatch) {
+	if (result != FcResultMatch)
 		fprintf(stderr, "font has no file location\n");
-	}
+
 	result = FcPatternGet(pat, FC_INDEX, 0, &fc_index);
 	if (result != FcResultMatch) {
 		fprintf(stderr, "font has no index, using 0 by default\n");
@@ -105,13 +100,12 @@ xuib_load_font(const char *name)
 			(const char *) fc_file.u.s,
 			fc_index.u.i,
 			&face);
-	if (error == FT_Err_Unknown_File_Format) {
+	if (error == FT_Err_Unknown_File_Format)
 		fprintf(stderr, "FT_New_Face error: font format not supported\n");
-	} else if (error == FT_Err_Cannot_Open_Resource) {
+	else if (error == FT_Err_Cannot_Open_Resource)
 		fprintf(stderr, "FT_New_Face error: could not open resources\n");
-	} else if (error) {
+	else if (error)
 		fprintf(stderr, "FT_New_Face error\n");
-	}
 
 	error = FT_Set_Char_Size(
 			face,
@@ -121,14 +115,9 @@ xuib_load_font(const char *name)
 	if (error) {
 		fprintf(stderr, "FT_Set_Char_Size error\n");
 	}
-
-	holder = malloc(sizeof(xuib_font_holder_t));
-
-	holder->face = face;
-
 	FcPatternDestroy(pat);
 
-	return holder;
+	return face;
 }
 
 xcb_render_pictforminfo_t *
@@ -349,7 +338,7 @@ get_pictforminfo(
 		},
 	};
 
-	if (format < 0 || format >= sizeof(standardFormats) / sizeof(*standardFormats))
+	if (format < 0 || format >= sizeof(standardFormats)/sizeof(*standardFormats))
 		return 0;
 
 	pfi = find_pict_format(
@@ -410,7 +399,7 @@ create_pen(xcb_connection_t *c, xcb_screen_t *s)
 }
 
 xcb_render_glyphset_t
-load_glyphset(xcb_connection_t *c, xuib_font_holder_t *holder, char *text)
+load_glyphset(xcb_connection_t *c, FT_Face *face, char *text)
 {
 	unsigned int i;
 
@@ -419,8 +408,8 @@ load_glyphset(xcb_connection_t *c, xuib_font_holder_t *holder, char *text)
 	xcb_render_glyphset_t gs;
 	xcb_render_pictforminfo_t *fmt;
 
-	FT_UInt glyph_index;
-	FT_Face face = holder->face;
+	FT_UInt index;
+	FT_Face face = face;
 	FT_Error error;
 
 	fmt = get_pictforminfo(c, XUIB_PICT_STANDARD_A_8);
@@ -430,21 +419,19 @@ load_glyphset(xcb_connection_t *c, xuib_font_holder_t *holder, char *text)
 	xuib_test_void_cookie(c, cookie, "Could not create glyphset in load_glyphset");
 
 	for (i = 0; i < strlen(text); i++) {
-		glyph_index = FT_Get_Char_Index(
-				holder->face,
+		index = FT_Get_Char_Index(
+				face,
 				(FT_ULong) text[i]);
 
 		error = FT_Select_Charmap(face, ft_encoding_unicode);
-		if (error) {
+		if (error)
 			fprintf(stderr, "Select charmap error\n");
-		}
 
-		glyph_index = FT_Get_Char_Index(face, (FT_ULong) text[i]);
+		index = FT_Get_Char_Index(face, (FT_ULong) text[i]);
 
-		error = FT_Load_Glyph(face, glyph_index, FT_LOAD_RENDER);
-		if (error) {
+		error = FT_Load_Glyph(face, index, FT_LOAD_RENDER);
+		if (error)
 			fprintf(stderr, "Load glyph error\n");
-		}
 	}
 	return gs;
 }
@@ -454,7 +441,7 @@ xuib_draw_text(
 		xcb_connection_t *c,
 		xcb_screen_t *s,
 		xcb_window_t window,
-		xuib_font_holder_t *holder,
+		FT_Face *face,
 		uint16_t x, uint16_t y,
 		uint16_t width, uint16_t height,
 		char *text)
@@ -464,7 +451,7 @@ xuib_draw_text(
 	xcb_render_pictforminfo_t *pfi = get_pictforminfo(c, XUIB_PICT_STANDARD_RGB_24);
 
 	xcb_render_glyphset_t gs;
-	gs = load_glyphset(c, holder, text);
+	gs = load_glyphset(c, face, text);
 
 	xcb_pixmap_t pm = xcb_generate_id(c);
 	cookie = xcb_create_pixmap_checked(
@@ -472,8 +459,7 @@ xuib_draw_text(
 			s->root_depth,
 			pm,
 			s->root,
-			width,
-			height);
+			width, height);
 	xuib_test_void_cookie(c, cookie, "Could not create draw_text pixmap");
 
 	xcb_render_picture_t picture = xcb_generate_id(c);
@@ -521,7 +507,6 @@ xuib_draw_text(
 	// 	.blue = 0xf0ff,
 	// 	.alpha = 0xffff
 	// };
-	// // create a 1x1 pixel pen (on repeat mode) of a certain color
 	// xcb_render_picture_t pen = create_pen(c, color);
 
 	// cookie = xcb_render_composite_glyphs_32_checked(

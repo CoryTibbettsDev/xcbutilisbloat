@@ -5,6 +5,11 @@
 
 #include <xcb/xcb.h>
 
+#include <fontconfig/fontconfig.h>
+
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include "xcbutilisbloat.h"
 
 xcb_connection_t *connection;
@@ -59,16 +64,14 @@ int main()
 	xuib_test_void_cookie(connection, cookie, "Could not create window");
 
 	/* Begin Testing */
-
 	const char *name = "monospace:size=18";
 	bool status;
 	status = xuib_font_init();
-	if (!status) {
+	if (!status)
 		return -1;
-	}
 
-	xuib_font_holder_t *holder;
-	holder = xuib_load_font(name);
+	FT_Face *face;
+	face = xuib_load_font(name);
 
 	cookie = xcb_map_window(connection, window);
 	xuib_test_void_cookie(connection, cookie, "Could not map window");
@@ -77,7 +80,7 @@ int main()
 
 	xcb_generic_event_t *ev;
 	xcb_key_press_event_t *kr;
-	while (( ev = xcb_wait_for_event(connection))) {
+	while (( ev = xcb_wait_for_event(connection)) ) {
 		xcb_generic_error_t *err = (xcb_generic_error_t *)ev;
 		switch (ev->response_type & ~0x80) {
 			case XCB_EXPOSE:
@@ -85,7 +88,7 @@ int main()
 						connection,
 						screen,
 						window,
-						holder,
+						face,
 						0, 0,
 						width, height,
 						"hello");
@@ -93,7 +96,7 @@ int main()
 			case XCB_KEY_PRESS:
 				kr = (xcb_key_press_event_t *)ev;
 				switch (kr->detail) {
-					case 9: /* escape */
+					case 9: /* ESC */
 					case 24: /* Q */
 						xcb_disconnect(connection);
 					}
